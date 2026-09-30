@@ -40,9 +40,14 @@
   .btn.primary { background: var(--brand); color: var(--brand-ink); }
   .btn.small { padding: 7px 11px; font-size: 14px; }
   .scan-btn { width: 100%; border-radius: 16px; padding: 18px; margin: 6px 0 12px; font-size: 20px; font-weight: 700; }
-  #reader { border-radius: 16px; overflow: hidden; background: #000; margin-bottom: 12px; }
+  #reader { margin-bottom: 12px; }
   #reader[hidden] { display: none; }
-  #reader video { display: block; width: 100% !important; }
+  .viewfinder { position: relative; border-radius: 16px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+  .viewfinder video { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .aim { position: absolute; inset: 30% 8%; border: 3px solid rgba(255,255,255,.85); border-radius: 12px; box-shadow: 0 0 0 999px rgba(0,0,0,.25); }
+  .aim::after { content: ""; position: absolute; inset: 50% 6% auto; height: 2px; background: #ef4444; }
+  .cam-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  .cam-tools:empty { display: none; }
 
   .search { margin-bottom: 14px; }
   input[type=search] {
@@ -143,7 +148,10 @@
   <!-- ===== scan ===== -->
   <section class="page" id="page-scan">
     <button class="btn primary scan-btn" id="scanBtn">סריקת ברקוד</button>
-    <div id="reader" hidden></div>
+    <div id="reader" hidden>
+      <div class="viewfinder"><video id="video" playsinline muted autoplay></video><div class="aim"></div></div>
+      <div class="cam-tools" id="camTools"></div>
+    </div>
     <div class="search">
       <input id="q" type="search" placeholder="או חיפוש לפי שם מוצר / מספר ברקוד" autocomplete="off">
       <ul class="suggest" id="suggest"></ul>
@@ -202,7 +210,6 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>מפת הסופר</button>
 </nav>
 
-<script src="vendor/html5-qrcode.min.js"></script>
 <script>
 let DATA = null;
 const $ = id => document.getElementById(id);
@@ -357,26 +364,117 @@ $('suggest').onclick = e => {
 };
 
 // ---------- scanner ----------
-let scanner = null;
+// Own camera handling (high resolution, continuous focus, zoom, camera choice) + barcode engine:
+// the phone's built-in detector when it has one (Android), otherwise the ZXing engine in vendor/.
+const FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128'];
+let detector = null, stream = null, scanTimer = null, cams = [], zoomLevels = [];
+
+async function getDetector() {
+  if (detector) return detector;
+  try {
+    if ('BarcodeDetector' in window) {
+      const ok = await BarcodeDetector.getSupportedFormats();
+      if (ok.includes('ean_13')) return detector = new BarcodeDetector({ formats: FORMATS.filter(f => ok.includes(f)) });
+    }
+  } catch {}
+  const mod = await import('./vendor/barcode-detector.js');
+  mod.setZXingModuleOverrides({ locateFile: (path, prefix) => path.endsWith('.wasm') ? new URL('vendor/zxing_reader.wasm', location.href).href : prefix + path });
+  return detector = new mod.BarcodeDetector({ formats: FORMATS });
+}
+
+// back cameras, best first: iPhone "triple"/"dual wide" switch to macro by themselves; skip ultra-wide/telephoto
+function rankCams(list) {
+  const score = d => {
+    const l = d.label.toLowerCase();
+    if (/front|user|קדמית|facing front/.test(l)) return -1;
+    if (/triple|dual wide/.test(l)) return 3;
+    if (/ultra|telephoto|tele/.test(l)) return 0;
+    if (/back|rear|environment|אחורית|facing back/.test(l)) return 2;
+    return 1;
+  };
+  return list.filter(d => score(d) >= 0).sort((a, b) => score(b) - score(a));
+}
+
+async function openCamera(deviceId) {
+  const video = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+  if (deviceId) video.deviceId = { exact: deviceId }; else video.facingMode = { ideal: 'environment' };
+  stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+  const v = $('video'); v.srcObject = stream; await v.play();
+  const track = stream.getVideoTracks()[0];
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  const adv = {};
+  if (caps.focusMode && caps.focusMode.includes('continuous')) adv.focusMode = 'continuous';
+  zoomLevels = [];
+  if (caps.zoom && caps.zoom.max >= 1.5) {
+    zoomLevels = [1, 2, 3].filter(z => z >= caps.zoom.min && z <= caps.zoom.max);
+    adv.zoom = Math.min(2, caps.zoom.max);  // lets you hold the phone further away, where it can focus
+  }
+  if (Object.keys(adv).length) { try { await track.applyConstraints({ advanced: [adv] }); } catch {} }
+  renderCamTools(adv.zoom, !!caps.torch);
+  return track;
+}
+
+function renderCamTools(zoom, torch) {
+  $('camTools').innerHTML =
+    (cams.length > 1 ? `<button class="btn small" data-cam>החלפת מצלמה</button>` : '') +
+    zoomLevels.map(z => `<button class="btn small ${z === zoom ? 'primary' : ''}" data-zoom="${z}">${z}×</button>`).join('') +
+    (torch ? `<button class="btn small" data-torch>פנס</button>` : '');
+}
+$('camTools').onclick = async e => {
+  const track = stream && stream.getVideoTracks()[0]; if (!track) return;
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.zoom) {
+    try { await track.applyConstraints({ advanced: [{ zoom: +b.dataset.zoom }] }); } catch {}
+    renderCamTools(+b.dataset.zoom, !!track.getCapabilities().torch);
+  } else if (b.dataset.torch !== undefined) {
+    const on = !b.classList.contains('primary');
+    try { await track.applyConstraints({ advanced: [{ torch: on }] }); b.classList.toggle('primary', on); } catch {}
+  } else if (b.dataset.cam !== undefined) {
+    const cur = track.getSettings().deviceId;
+    const next = cams[(cams.findIndex(c => c.deviceId === cur) + 1) % cams.length];
+    write('camera', next.deviceId);
+    stream.getTracks().forEach(t => t.stop());
+    try { await openCamera(next.deviceId); } catch { await openCamera(); }
+  }
+};
+
 async function stopScan() {
-  if (scanner) { try { await scanner.stop(); } catch {} scanner.clear(); scanner = null; }
+  clearTimeout(scanTimer); scanTimer = null;
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $('video').srcObject = null;
   $('reader').hidden = true;
   $('scanBtn').textContent = 'סריקת ברקוד';
 }
+
 $('scanBtn').onclick = async () => {
-  if (scanner) return stopScan();
+  if (stream) return stopScan();
   $('reader').hidden = false;
   $('scanBtn').textContent = 'ביטול';
-  const F = Html5QrcodeSupportedFormats;
-  scanner = new Html5Qrcode('reader', {
-    formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128],
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-    verbose: false,
-  });
+  $('camTools').innerHTML = '';
   try {
-    await scanner.start({ facingMode: 'environment' },
-      { fps: 12, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.floor(Math.min(h, w) * 0.45) }) },
-      async text => { if (navigator.vibrate) navigator.vibrate(60); await stopScan(); show(text); });
+    const det = getDetector();
+    // first open (this asks permission and reveals camera names), then switch to the best back camera
+    const saved = read('camera', null);
+    let track = await (saved ? openCamera(saved).catch(() => openCamera()) : openCamera());
+    cams = rankCams((await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.label));
+    if (!saved && cams[0] && cams[0].deviceId !== track.getSettings().deviceId) {
+      stream.getTracks().forEach(t => t.stop());
+      track = await openCamera(cams[0].deviceId).catch(() => openCamera());
+    } else renderCamTools(track.getSettings().zoom, !!(track.getCapabilities && track.getCapabilities().torch));
+    const d = await det;
+    const loop = async () => {
+      if (!stream) return;
+      const v = $('video');
+      try {
+        if (v.readyState >= 2) {
+          const found = await d.detect(v);
+          const code = found.map(f => f.rawValue).find(x => /^\d{6,14}$/.test(x));
+          if (code) { if (navigator.vibrate) navigator.vibrate(60); await stopScan(); show(code); return; }
+        }
+      } catch {}
+      scanTimer = setTimeout(loop, 120);
+    };
+    loop();
   } catch (err) {
     await stopScan();
     $('result').innerHTML = `<div class="card"><h2 class="notfound">אין גישה למצלמה</h2>
