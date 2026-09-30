@@ -48,6 +48,11 @@
   .aim::after { content: ""; position: absolute; inset: 50% 6% auto; height: 2px; background: #ef4444; }
   .cam-tools { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
   .cam-tools:empty { display: none; }
+  .aim { pointer-events: none; }
+  .focus-ring { position: absolute; width: 64px; height: 64px; margin: -32px 0 0 -32px; border: 2px solid #facc15; border-radius: 50%; pointer-events: none; }
+  .focus-ring[hidden] { display: none; }
+  .cam-info { color: var(--muted); font-size: 12px; text-align: center; margin-top: 6px; }
+  #camInfo { direction: ltr; unicode-bidi: isolate; }
 
   .search { margin-bottom: 14px; }
   input[type=search] {
@@ -149,8 +154,9 @@
   <section class="page" id="page-scan">
     <button class="btn primary scan-btn" id="scanBtn">סריקת ברקוד</button>
     <div id="reader" hidden>
-      <div class="viewfinder"><video id="video" playsinline muted autoplay></video><div class="aim"></div></div>
+      <div class="viewfinder"><video id="video" playsinline muted autoplay></video><div class="aim"></div><div class="focus-ring" id="focusRing" hidden></div></div>
       <div class="cam-tools" id="camTools"></div>
+      <div class="cam-info">שים את הברקוד בתוך המסגרת, במרחק של כ־20 ס״מ. הקשה על התמונה מפקסת מחדש.<br><span id="camInfo"></span></div>
     </div>
     <div class="search">
       <input id="q" type="search" placeholder="או חיפוש לפי שם מוצר / מספר ברקוד" autocomplete="off">
@@ -411,6 +417,7 @@ async function openCamera(deviceId) {
   }
   if (Object.keys(adv).length) { try { await track.applyConstraints({ advanced: [adv] }); } catch {} }
   renderCamTools(adv.zoom, !!caps.torch);
+  setTimeout(showCamInfo, 300);
   return track;
 }
 
@@ -426,6 +433,7 @@ $('camTools').onclick = async e => {
   if (b.dataset.zoom) {
     try { await track.applyConstraints({ advanced: [{ zoom: +b.dataset.zoom }] }); } catch {}
     renderCamTools(+b.dataset.zoom, !!track.getCapabilities().torch);
+    showCamInfo();
   } else if (b.dataset.torch !== undefined) {
     const on = !b.classList.contains('primary');
     try { await track.applyConstraints({ advanced: [{ torch: on }] }); b.classList.toggle('primary', on); } catch {}
@@ -437,6 +445,45 @@ $('camTools').onclick = async e => {
     try { await openCamera(next.deviceId); } catch { await openCamera(); }
   }
 };
+
+// the part of the camera picture that sits under the white frame (video is shown with object-fit: cover)
+const cropCanvas = document.createElement('canvas');
+function aimCrop(v, zoom = 1) {
+  const box = v.getBoundingClientRect(), vw = v.videoWidth, vh = v.videoHeight;
+  const scale = Math.max(box.width / vw, box.height / vh);
+  const shownW = box.width / scale, shownH = box.height / scale;
+  const x0 = (vw - shownW) / 2, y0 = (vh - shownH) / 2;
+  // white frame = 8%..92% wide, 30%..70% high; take a little extra around it
+  const sx = x0 + shownW * 0.03, sw = shownW * 0.94, sy = y0 + shownH * 0.22, sh = shownH * 0.56;
+  cropCanvas.width = Math.round(sw * zoom); cropCanvas.height = Math.round(sh * zoom);
+  const g = cropCanvas.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingQuality = 'high';
+  g.drawImage(v, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+  return cropCanvas;
+}
+
+let engineName = '';
+function showCamInfo() {
+  const t = stream && stream.getVideoTracks()[0]; if (!t) return;
+  const st = t.getSettings();
+  $('camInfo').textContent = [engineName, t.label, st.width && st.height ? `${st.width}×${st.height}` : '', st.zoom ? `זום ${Math.round(st.zoom * 10) / 10}` : '']
+    .filter(Boolean).join(' · ');
+}
+
+// tap the picture to refocus (works on phones that allow it, mostly Android)
+$('video').parentElement.addEventListener('click', async e => {
+  const t = stream && stream.getVideoTracks()[0]; if (!t || !t.getCapabilities) return;
+  const caps = t.getCapabilities(), r = e.currentTarget.getBoundingClientRect();
+  const adv = {};
+  if (caps.pointsOfInterest !== undefined) adv.pointsOfInterest = [{ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }];
+  if (caps.focusMode && caps.focusMode.includes('single-shot')) adv.focusMode = 'single-shot';
+  if (!Object.keys(adv).length) return;
+  const ring = $('focusRing');
+  ring.style.left = (e.clientX - r.left) + 'px'; ring.style.top = (e.clientY - r.top) + 'px';
+  ring.hidden = false; setTimeout(() => ring.hidden = true, 700);
+  try { await t.applyConstraints({ advanced: [adv] }); } catch {}
+  if (adv.focusMode) setTimeout(() => t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 1500);
+});
 
 async function stopScan() {
   clearTimeout(scanTimer); scanTimer = null;
@@ -450,7 +497,7 @@ $('scanBtn').onclick = async () => {
   if (stream) return stopScan();
   $('reader').hidden = false;
   $('scanBtn').textContent = 'ביטול';
-  $('camTools').innerHTML = '';
+  $('camTools').innerHTML = ''; $('camInfo').textContent = '';
   try {
     const det = getDetector();
     // first open (this asks permission and reveals camera names), then switch to the best back camera
@@ -462,13 +509,20 @@ $('scanBtn').onclick = async () => {
       track = await openCamera(cams[0].deviceId).catch(() => openCamera());
     } else renderCamTools(track.getSettings().zoom, !!(track.getCapabilities && track.getCapabilities().torch));
     const d = await det;
+    engineName = d.constructor === window.BarcodeDetector ? 'מובנה' : 'ZXing';
+    showCamInfo();
+    let frame = 0;
+    const seen = [];  // a blurry frame can be misread as a different valid barcode, so wait for the same number twice
     const loop = async () => {
       if (!stream) return;
       const v = $('video');
       try {
-        if (v.readyState >= 2) {
-          const found = await d.detect(v);
-          const code = found.map(f => f.rawValue).find(x => /^\d{6,14}$/.test(x));
+        if (v.readyState >= 2 && v.videoWidth) {
+          const pass = frame++ % 3;  // frame area, frame area enlarged ×2, whole picture
+          const found = await d.detect(pass === 2 ? v : aimCrop(v, pass === 1 ? 2 : 1));
+          const read = found.map(f => f.rawValue).find(x => /^\d{6,14}$/.test(x));
+          if (read) { seen.push(read); if (seen.length > 6) seen.shift(); }
+          const code = read && seen.filter(x => x === read).length >= 2 ? read : null;
           if (code) { if (navigator.vibrate) navigator.vibrate(60); await stopScan(); show(code); return; }
         }
       } catch {}
