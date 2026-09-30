@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>כמה זה עולה</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root {
+    --bg: #f6f7f5; --card: #fff; --ink: #1c2321; --muted: #6b7470; --line: #e3e7e4;
+    --brand: #0f766e; --brand-soft: #e6f4f1; --cheap: #15803d; --cheap-soft: #eaf7ee; --warn: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121615; --card: #1b2120; --ink: #e8ecea; --muted: #97a19d; --line: #2c3431;
+      --brand: #2dd4bf; --brand-soft: #16302c; --cheap: #4ade80; --cheap-soft: #15291c; --warn: #fbbf24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 17px; line-height: 1.45;
+    padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 520px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 0 10px; }
+  h1 { font-size: 24px; margin: 0; }
+  .updated { color: var(--muted); font-size: 13px; }
+
+  .scan-btn {
+    width: 100%; border: 0; border-radius: 16px; padding: 18px; margin: 6px 0 12px;
+    background: var(--brand); color: #fff; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer;
+  }
+  @media (prefers-color-scheme: dark) { .scan-btn { color: #062a26; } }
+  #reader { border-radius: 16px; overflow: hidden; background: #000; margin-bottom: 12px; }
+  #reader[hidden] { display: none; }
+  #reader video { display: block; width: 100% !important; }
+
+  .search { position: relative; margin-bottom: 14px; }
+  .search input {
+    width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font: inherit;
+  }
+  .suggest { list-style: none; margin: 4px 0 0; padding: 0; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .suggest:empty { display: none; }
+  .suggest li { padding: 11px 14px; border-top: 1px solid var(--line); cursor: pointer; }
+  .suggest li:first-child { border-top: 0; }
+  .suggest li small { color: var(--muted); display: block; font-size: 13px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 20px; margin: 0 0 2px; }
+  .maker { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+  .code { color: var(--muted); font-size: 12px; margin-top: 10px; direction: ltr; text-align: right; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 12px; margin-top: 6px; background: var(--bg); }
+  .row.best { background: var(--cheap-soft); outline: 2px solid var(--cheap); }
+  .row .store b { display: block; }
+  .row .store span { color: var(--muted); font-size: 13px; }
+  .row .price { font-size: 22px; font-weight: 700; direction: ltr; }
+  .row.best .price { color: var(--cheap); }
+  .row.missing .price { font-size: 15px; font-weight: 400; color: var(--muted); direction: rtl; }
+  .save { margin-top: 12px; font-weight: 700; color: var(--cheap); }
+  .notfound { color: var(--warn); }
+
+  h3 { font-size: 15px; color: var(--muted); margin: 22px 0 6px; font-weight: 600; }
+  .history { list-style: none; padding: 0; margin: 0; }
+  .history li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .history li span:last-child { color: var(--muted); white-space: nowrap; direction: ltr; }
+  .status { color: var(--muted); text-align: center; padding: 30px 0; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>כמה זה עולה</h1>
+    <span class="updated" id="updated"></span>
+  </header>
+
+  <button class="scan-btn" id="scanBtn">סריקת ברקוד</button>
+  <div id="reader" hidden></div>
+
+  <div class="search">
+    <input id="q" type="search" placeholder="או חיפוש לפי שם מוצר / מספר ברקוד" autocomplete="off">
+    <ul class="suggest" id="suggest"></ul>
+  </div>
+
+  <div id="result"></div>
+
+  <h3 id="historyTitle" hidden>נסרקו לאחרונה</h3>
+  <ul class="history" id="history"></ul>
+  <div class="status" id="status">טוען מחירים…</div>
+</main>
+
+<script src="vendor/html5-qrcode.min.js"></script>
+<script>
+let DATA = null;
+const $ = id => document.getElementById(id);
+const shekel = n => '₪' + n.toFixed(2).replace(/\.00$/, '');
+
+function load() {
+  return fetch('data/prices.json', { cache: 'no-cache' })
+    .then(r => r.json())
+    .then(d => {
+      DATA = d;
+      $('updated').textContent = 'מחירים מ־' + d.updated;
+      $('status').hidden = true;
+      renderHistory();
+    })
+    .catch(() => { $('status').textContent = 'לא הצלחתי לטעון את המחירים. בדוק חיבור לאינטרנט.'; });
+}
+
+// ---- result ----
+function show(code) {
+  code = String(code).trim().replace(/^0+/, '');
+  const item = DATA.items[code];
+  const box = $('result');
+  if (!item) {
+    box.innerHTML = `<div class="card"><h2 class="notfound">המוצר לא נמצא</h2>
+      <div class="maker">הברקוד לא מופיע באף אחד מהסניפים. אולי הסניף לא מוכר אותו.</div>
+      <div class="code">${code}</div></div>`;
+    return;
+  }
+  const [name, maker, prices] = item;
+  const rows = DATA.stores.map((s, i) => ({ ...s, price: prices[i] }))
+    .sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
+  const have = rows.filter(r => r.price != null);
+  const best = have[0];
+  const multi = have.length > 1 && have[have.length - 1].price > best.price;
+
+  box.innerHTML = `<div class="card">
+    <h2>${esc(name)}</h2>
+    <div class="maker">${esc(maker)}</div>
+    ${rows.map(r => `
+      <div class="row ${r.price == null ? 'missing' : (multi && r === best ? 'best' : '')}">
+        <div class="store"><b>${r.chain}</b><span>${r.branch}</span></div>
+        <div class="price">${r.price == null ? 'לא נמכר בסניף' : shekel(r.price)}</div>
+      </div>`).join('')}
+    ${multi ? `<div class="save">ב${best.chain} זול יותר ב־${shekel(have[have.length - 1].price - best.price)}</div>` : ''}
+    <div class="code">${code}</div>
+  </div>`;
+  addHistory(code);
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// ---- history ----
+function getHistory() { try { return JSON.parse(localStorage.getItem('history') || '[]'); } catch { return []; } }
+function addHistory(code) {
+  const h = [code, ...getHistory().filter(c => c !== code)].slice(0, 15);
+  try { localStorage.setItem('history', JSON.stringify(h)); } catch {}
+  renderHistory();
+}
+function renderHistory() {
+  const h = getHistory().filter(c => DATA.items[c]);
+  $('historyTitle').hidden = !h.length;
+  $('history').innerHTML = h.map(c => {
+    const p = DATA.items[c][2].filter(x => x != null);
+    return `<li data-code="${c}"><span>${esc(DATA.items[c][0])}</span><span>${shekel(Math.min(...p))}</span></li>`;
+  }).join('');
+}
+$('history').onclick = e => { const li = e.target.closest('li'); if (li) { show(li.dataset.code); scrollTo({ top: 0, behavior: 'smooth' }); } };
+
+// ---- search ----
+$('q').oninput = () => {
+  const q = $('q').value.trim();
+  const ul = $('suggest');
+  if (!DATA || q.length < 2) { ul.innerHTML = ''; return; }
+  if (/^\d{4,}$/.test(q)) {
+    const code = q.replace(/^0+/, '');
+    ul.innerHTML = DATA.items[code] ? `<li data-code="${code}">${esc(DATA.items[code][0])}</li>` : '';
+    return;
+  }
+  const words = q.split(/\s+/);
+  const hits = [];
+  for (const [code, it] of Object.entries(DATA.items)) {
+    const text = it[0] + ' ' + it[1];
+    if (words.every(w => text.includes(w))) {
+      hits.push([code, it]);
+      if (hits.length >= 30) break;
+    }
+  }
+  ul.innerHTML = hits.map(([c, it]) => `<li data-code="${c}">${esc(it[0])}<small>${esc(it[1])}</small></li>`).join('');
+};
+$('q').onkeydown = e => { if (e.key === 'Enter' && /^\d+$/.test($('q').value.trim())) { show($('q').value); $('suggest').innerHTML = ''; } };
+$('suggest').onclick = e => {
+  const li = e.target.closest('li'); if (!li) return;
+  show(li.dataset.code); $('suggest').innerHTML = ''; $('q').value = ''; $('q').blur();
+};
+
+// ---- scanner ----
+let scanner = null;
+async function stopScan() {
+  if (scanner) { try { await scanner.stop(); } catch {} scanner.clear(); scanner = null; }
+  $('reader').hidden = true;
+  $('scanBtn').textContent = 'סריקת ברקוד';
+}
+$('scanBtn').onclick = async () => {
+  if (scanner) return stopScan();
+  $('reader').hidden = false;
+  $('scanBtn').textContent = 'ביטול';
+  const F = Html5QrcodeSupportedFormats;
+  scanner = new Html5Qrcode('reader', {
+    formatsToSupport: [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.CODE_128],
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    verbose: false,
+  });
+  try {
+    await scanner.start({ facingMode: 'environment' },
+      { fps: 12, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.floor(Math.min(h, w) * 0.45) }) },
+      async text => { if (navigator.vibrate) navigator.vibrate(60); await stopScan(); show(text); });
+  } catch (err) {
+    await stopScan();
+    $('result').innerHTML = `<div class="card"><h2 class="notfound">אין גישה למצלמה</h2>
+      <div class="maker">צריך לאשר לאתר להשתמש במצלמה (בהגדרות הדפדפן). בינתיים אפשר להקליד את מספר הברקוד בחיפוש.</div></div>`;
+  }
+};
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+load();
+</script>
+</body>
+</html>
