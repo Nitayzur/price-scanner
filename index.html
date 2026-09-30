@@ -11,95 +11,218 @@
 <style>
   :root {
     --bg: #f6f7f5; --card: #fff; --ink: #1c2321; --muted: #6b7470; --line: #e3e7e4;
-    --brand: #0f766e; --brand-soft: #e6f4f1; --cheap: #15803d; --cheap-soft: #eaf7ee; --warn: #b45309;
+    --brand: #0f766e; --brand-ink: #fff; --brand-soft: #e6f4f1; --cheap: #15803d; --cheap-soft: #eaf7ee;
+    --warn: #b45309; --promo: #c2410c; --promo-soft: #fff1e8; --star: #eab308; --pin: #dc2626;
+    --section: #dbeafe; --section-line: #93c5fd;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #121615; --card: #1b2120; --ink: #e8ecea; --muted: #97a19d; --line: #2c3431;
-      --brand: #2dd4bf; --brand-soft: #16302c; --cheap: #4ade80; --cheap-soft: #15291c; --warn: #fbbf24;
+      --brand: #2dd4bf; --brand-ink: #062a26; --brand-soft: #16302c; --cheap: #4ade80; --cheap-soft: #15291c;
+      --warn: #fbbf24; --promo: #fb923c; --promo-soft: #2e1d12; --star: #facc15; --pin: #f87171;
+      --section: #1e2a3d; --section-line: #3b5b8a;
     }
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
     font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 17px; line-height: 1.45;
-    padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+    padding: env(safe-area-inset-top) 16px calc(84px + env(safe-area-inset-bottom));
   }
-  main { max-width: 520px; margin: 0 auto; }
-  header { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 0 10px; }
+  main { max-width: 560px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 18px 0 10px; }
   h1 { font-size: 24px; margin: 0; }
   .updated { color: var(--muted); font-size: 13px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .page[hidden] { display: none; }
 
-  .scan-btn {
-    width: 100%; border: 0; border-radius: 16px; padding: 18px; margin: 6px 0 12px;
-    background: var(--brand); color: #fff; font: inherit; font-size: 20px; font-weight: 700; cursor: pointer;
-  }
-  @media (prefers-color-scheme: dark) { .scan-btn { color: #062a26; } }
+  .btn { border: 0; border-radius: 12px; padding: 11px 14px; background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+  .btn.primary { background: var(--brand); color: var(--brand-ink); }
+  .btn.small { padding: 7px 11px; font-size: 14px; }
+  .scan-btn { width: 100%; border-radius: 16px; padding: 18px; margin: 6px 0 12px; font-size: 20px; font-weight: 700; }
   #reader { border-radius: 16px; overflow: hidden; background: #000; margin-bottom: 12px; }
   #reader[hidden] { display: none; }
   #reader video { display: block; width: 100% !important; }
 
-  .search { position: relative; margin-bottom: 14px; }
-  .search input {
+  .search { margin-bottom: 14px; }
+  input[type=search] {
     width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--line);
     background: var(--card); color: var(--ink); font: inherit;
   }
-  .suggest { list-style: none; margin: 4px 0 0; padding: 0; background: var(--card);
-    border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .suggest { list-style: none; margin: 4px 0 0; padding: 0; background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .suggest:empty { display: none; }
   .suggest li { padding: 11px 14px; border-top: 1px solid var(--line); cursor: pointer; }
   .suggest li:first-child { border-top: 0; }
   .suggest li small { color: var(--muted); display: block; font-size: 13px; }
 
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+  .title-row { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
   .card h2 { font-size: 20px; margin: 0 0 2px; }
+  .star { border: 0; background: none; font-size: 28px; line-height: 1; padding: 0 2px; color: var(--muted); }
+  .star.on { color: var(--star); }
   .maker { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
   .code { color: var(--muted); font-size: 12px; margin-top: 10px; direction: ltr; text-align: right; }
-  .row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-radius: 12px; margin-top: 6px; background: var(--bg); }
+  .row { padding: 12px; border-radius: 12px; margin-top: 6px; background: var(--bg); }
   .row.best { background: var(--cheap-soft); outline: 2px solid var(--cheap); }
+  .row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .row .store b { display: block; }
   .row .store span { color: var(--muted); font-size: 13px; }
-  .row .price { font-size: 22px; font-weight: 700; direction: ltr; }
+  .row .price { font-size: 22px; font-weight: 700; white-space: nowrap; }
+  .row .price s { font-size: 15px; font-weight: 400; color: var(--muted); margin-inline-start: 6px; }
   .row.best .price { color: var(--cheap); }
-  .row.missing .price { font-size: 15px; font-weight: 400; color: var(--muted); direction: rtl; }
+  .row.missing .price { font-size: 15px; font-weight: 400; color: var(--muted); }
+  .promo { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--promo-soft); color: var(--promo); font-size: 14px; }
+  .promo b { font-size: 15px; }
+  .promo small { display: block; color: var(--muted); }
+  .tag { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; margin-inline-start: 4px; }
+  .place { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
   .save { margin-top: 12px; font-weight: 700; color: var(--cheap); }
   .notfound { color: var(--warn); }
 
   h3 { font-size: 15px; color: var(--muted); margin: 22px 0 6px; font-weight: 600; }
-  .history { list-style: none; padding: 0; margin: 0; }
-  .history li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
-  .history li span:last-child { color: var(--muted); white-space: nowrap; direction: ltr; }
-  .status { color: var(--muted); text-align: center; padding: 30px 0; }
+  .list { list-style: none; padding: 0; margin: 0; }
+  .list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 2px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .list li .nm { flex: 1; }
+  .list li .nm small { display: block; color: var(--muted); font-size: 13px; }
+  .list li .pr { white-space: nowrap; text-align: left; font-weight: 700; }
+  .list li .pr small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .status, .empty { color: var(--muted); text-align: center; padding: 30px 8px; }
+
+  /* tabs */
+  nav.tabs {
+    position: fixed; inset: auto 0 0 0; display: flex; background: var(--card); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom); z-index: 20;
+  }
+  nav.tabs button { flex: 1; border: 0; background: none; padding: 10px 0 12px; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  nav.tabs button svg { width: 24px; height: 24px; }
+  nav.tabs button.on { color: var(--brand); font-weight: 700; }
+
+  /* map */
+  .seg { display: flex; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 3px; margin-bottom: 10px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 9px 6px; border-radius: 9px; font-size: 15px; }
+  .seg button.on { background: var(--brand); color: var(--brand-ink); font-weight: 700; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .toolbar[hidden] { display: none; }
+  .banner { background: var(--promo-soft); color: var(--promo); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; }
+  .banner[hidden] { display: none; }
+  #map {
+    position: relative; width: 100%; aspect-ratio: 3 / 4; background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; overflow: hidden; background-size: 100% 100%; background-repeat: no-repeat; direction: ltr;
+    user-select: none; -webkit-user-select: none;
+  }
+  #map.editing, #map.placing { touch-action: none; }
+  #map.placing { outline: 3px dashed var(--promo); cursor: crosshair; }
+  .sec {
+    position: absolute; background: color-mix(in srgb, var(--section) 85%, transparent); border: 1.5px solid var(--section-line); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center; text-align: center; font-size: 12px; font-weight: 600;
+    padding: 2px; overflow: hidden; direction: rtl; color: var(--ink);
+  }
+  #map.editing .sec { cursor: move; border-style: dashed; }
+  .sec .grip { display: none; position: absolute; right: -1px; bottom: -1px; width: 22px; height: 22px; background: var(--section-line); border-radius: 6px 0 6px 0; cursor: nwse-resize; }
+  #map.editing .sec .grip { display: block; }
+  .pin {
+    position: absolute; width: 18px; height: 18px; margin: -18px 0 0 -9px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    background: var(--pin); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); cursor: pointer;
+  }
+  .pin.hit { width: 26px; height: 26px; margin: -26px 0 0 -13px; background: var(--star); z-index: 5; }
+  .pin.dim { opacity: .25; }
+  #map.editing .pin { pointer-events: none; opacity: .5; }
+  .bubble { position: absolute; transform: translate(-50%, -100%); margin-top: -26px; background: var(--ink); color: var(--bg); padding: 6px 10px; border-radius: 10px; font-size: 13px; white-space: nowrap; max-width: 80%; overflow: hidden; text-overflow: ellipsis; direction: rtl; z-index: 6; cursor: pointer; }
+  .map-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--muted); font-size: 15px; direction: rtl; pointer-events: none; }
+  .fineprint { color: var(--muted); font-size: 13px; margin-top: 14px; }
+  .fineprint button { border: 0; background: none; color: var(--brand); text-decoration: underline; padding: 0; font-size: 13px; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>כמה זה עולה</h1>
+    <h1 id="pageTitle">כמה זה עולה</h1>
     <span class="updated" id="updated"></span>
   </header>
 
-  <button class="scan-btn" id="scanBtn">סריקת ברקוד</button>
-  <div id="reader" hidden></div>
+  <!-- ===== scan ===== -->
+  <section class="page" id="page-scan">
+    <button class="btn primary scan-btn" id="scanBtn">סריקת ברקוד</button>
+    <div id="reader" hidden></div>
+    <div class="search">
+      <input id="q" type="search" placeholder="או חיפוש לפי שם מוצר / מספר ברקוד" autocomplete="off">
+      <ul class="suggest" id="suggest"></ul>
+    </div>
+    <div id="result"></div>
+    <h3 id="historyTitle" hidden>נסרקו לאחרונה</h3>
+    <ul class="list" id="history"></ul>
+    <div class="status" id="status">טוען מחירים…</div>
+  </section>
 
-  <div class="search">
-    <input id="q" type="search" placeholder="או חיפוש לפי שם מוצר / מספר ברקוד" autocomplete="off">
-    <ul class="suggest" id="suggest"></ul>
-  </div>
+  <!-- ===== favorites ===== -->
+  <section class="page" id="page-favs" hidden>
+    <div id="favSummary"></div>
+    <ul class="list" id="favList"></ul>
+  </section>
 
-  <div id="result"></div>
-
-  <h3 id="historyTitle" hidden>נסרקו לאחרונה</h3>
-  <ul class="history" id="history"></ul>
-  <div class="status" id="status">טוען מחירים…</div>
+  <!-- ===== map ===== -->
+  <section class="page" id="page-map" hidden>
+    <div class="seg" id="storeSeg"></div>
+    <div class="banner" id="placeBanner" hidden>
+      <span id="placeText"></span>
+      <button class="btn small" id="placeCancel">ביטול</button>
+    </div>
+    <div class="search" id="mapSearchBox">
+      <input id="mapQ" type="search" placeholder="איפה נמצא…" autocomplete="off">
+    </div>
+    <div class="toolbar" id="viewTools">
+      <button class="btn small" id="editBtn">עריכת מפה</button>
+    </div>
+    <div class="toolbar" id="editTools" hidden>
+      <button class="btn small primary" id="doneBtn">סיום עריכה</button>
+      <button class="btn small" id="addSecBtn">+ אזור</button>
+      <button class="btn small" id="bgBtn">תמונת רקע</button>
+      <button class="btn small" id="bgClear" hidden>הסרת תמונה</button>
+      <input type="file" id="bgFile" accept="image/*" hidden>
+    </div>
+    <div id="map"></div>
+    <p class="fineprint" id="editHint" hidden>
+      גרור אזור כדי להזיז אותו. גרור את הפינה כדי לשנות גודל. הקשה על אזור משנה את השם שלו (שם ריק מוחק אותו).
+    </p>
+    <p class="fineprint">
+      המפה והמועדפים נשמרים רק בטלפון הזה.
+      <button id="exportBtn">שמירת גיבוי</button> ·
+      <button id="importBtn">שחזור מגיבוי</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </p>
+  </section>
 </main>
+
+<nav class="tabs">
+  <button data-tab="scan" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M14 8v8M17 8v8"/></svg>סריקה</button>
+  <button data-tab="favs">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>מועדפים</button>
+  <button data-tab="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>מפת הסופר</button>
+</nav>
 
 <script src="vendor/html5-qrcode.min.js"></script>
 <script>
 let DATA = null;
 const $ = id => document.getElementById(id);
-const shekel = n => '₪' + n.toFixed(2).replace(/\.00$/, '');
+const shekel = n => '₪' + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+// ---------- saved state (this device only) ----------
+function read(key, fallback) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; } }
+function write(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); return true; }
+  catch { alert('אין מספיק מקום לשמירה בטלפון. נסה תמונת רקע קטנה יותר.'); return false; }
+}
+let favs = read('favs', []);
+let maps = read('maps', {});   // storeKey -> { sections: [{id,x,y,w,h,name}], bg }
+let pins = read('pins', {});   // storeKey -> { barcode: [x, y] }
+const storeKey = s => s.chain + '|' + s.branch;
+const mapOf = k => (maps[k] ||= { sections: [], bg: null });
+const pinsOf = k => (pins[k] ||= {});
+
+// ---------- prices ----------
 function load() {
   return fetch('data/prices.json', { cache: 'no-cache' })
     .then(r => r.json())
@@ -107,82 +230,125 @@ function load() {
       DATA = d;
       $('updated').textContent = 'מחירים מ־' + d.updated;
       $('status').hidden = true;
-      renderHistory();
+      renderHistory(); renderStoreSeg();
     })
     .catch(() => { $('status').textContent = 'לא הצלחתי לטעון את המחירים. בדוק חיבור לאינטרנט.'; });
 }
 
-// ---- result ----
+// per store: { chain, branch, key, i, price, promo, eff } — eff = cheapest price per unit you can get
+function offers(code) {
+  const [, , prices, promos = []] = DATA.items[code];
+  return DATA.stores.map((s, i) => {
+    const promo = promos[i] || null;
+    const price = prices[i];
+    const eff = price == null ? null : promo ? Math.min(price, promo[1] / promo[0]) : price;
+    return { ...s, key: storeKey(s), i, price, promo, eff };
+  });
+}
+
+function promoText(p) {
+  const [qty, total, end, desc, club] = p;
+  const deal = qty == 1 ? `${shekel(total)} במקום` : `${qty} ב־${shekel(total)} (${shekel(total / qty)} ליחידה)`;
+  return `<div class="promo"><b>מבצע: ${deal}</b>${club ? '<span class="tag">למועדון</span>' : ''}
+    <small>${esc(desc)} · עד ${end}</small></div>`;
+}
+
+function sectionAt(key, x, y) {
+  const s = mapOf(key).sections.find(s => x >= s.x && x <= s.x + s.w && y >= s.y && y <= s.y + s.h);
+  return s ? s.name : null;
+}
+
+// ---------- product card ----------
+let current = null;
 function show(code) {
   code = String(code).trim().replace(/^0+/, '');
-  const item = DATA.items[code];
+  current = code;
   const box = $('result');
-  if (!item) {
+  if (!DATA.items[code]) {
     box.innerHTML = `<div class="card"><h2 class="notfound">המוצר לא נמצא</h2>
       <div class="maker">הברקוד לא מופיע באף אחד מהסניפים. אולי הסניף לא מוכר אותו.</div>
       <div class="code">${code}</div></div>`;
     return;
   }
-  const [name, maker, prices] = item;
-  const rows = DATA.stores.map((s, i) => ({ ...s, price: prices[i] }))
-    .sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
-  const have = rows.filter(r => r.price != null);
+  const [name, maker] = DATA.items[code];
+  const rows = offers(code).sort((a, b) => (a.eff ?? 1e9) - (b.eff ?? 1e9));
+  const have = rows.filter(r => r.eff != null);
   const best = have[0];
-  const multi = have.length > 1 && have[have.length - 1].price > best.price;
+  const multi = have.length > 1 && have[have.length - 1].eff > best.eff + 0.001;
+  const fav = favs.includes(code);
 
   box.innerHTML = `<div class="card">
-    <h2>${esc(name)}</h2>
-    <div class="maker">${esc(maker)}</div>
-    ${rows.map(r => `
-      <div class="row ${r.price == null ? 'missing' : (multi && r === best ? 'best' : '')}">
-        <div class="store"><b>${r.chain}</b><span>${r.branch}</span></div>
-        <div class="price">${r.price == null ? 'לא נמכר בסניף' : shekel(r.price)}</div>
-      </div>`).join('')}
-    ${multi ? `<div class="save">ב${best.chain} זול יותר ב־${shekel(have[have.length - 1].price - best.price)}</div>` : ''}
+    <div class="title-row">
+      <div><h2>${esc(name)}</h2><div class="maker">${esc(maker)}</div></div>
+      <button class="star ${fav ? 'on' : ''}" id="favBtn" aria-label="מועדפים">${fav ? '★' : '☆'}</button>
+    </div>
+    ${rows.map(r => {
+      const pin = pinsOf(r.key)[code];
+      const where = pin ? (sectionAt(r.key, pin[0], pin[1]) || 'מסומן במפה') : null;
+      return `<div class="row ${r.price == null ? 'missing' : (multi && r === best ? 'best' : '')}">
+        <div class="row-top">
+          <div class="store"><b>${r.chain}</b><span>${r.branch}</span></div>
+          <div class="price">${r.price == null ? 'לא נמכר בסניף'
+            : (r.promo && r.promo[0] == 1 ? shekel(r.promo[1]) + `<s>${shekel(r.price)}</s>` : shekel(r.price))}</div>
+        </div>
+        ${r.promo && r.promo[0] != 1 ? promoText(r.promo) : ''}
+        ${r.promo && r.promo[0] == 1 ? `<div class="promo"><b>במבצע</b>${r.promo[4] ? '<span class="tag">למועדון</span>' : ''}<small>${esc(r.promo[3])} · עד ${r.promo[2]}</small></div>` : ''}
+        ${r.price == null ? '' : `<div class="place">${where
+          ? `📍 ${esc(where)} <button class="btn small" data-show="${r.i}">הצג במפה</button><button class="btn small" data-place="${r.i}">שינוי</button>`
+          : `<button class="btn small" data-place="${r.i}">📍 סימון מקום בסניף</button>`}</div>`}
+      </div>`;
+    }).join('')}
+    ${multi ? `<div class="save">ב${best.chain} זול יותר ב־${shekel(have[have.length - 1].eff - best.eff)} ליחידה${best.promo ? ' (כולל מבצע)' : ''}</div>` : ''}
     <div class="code">${code}</div>
   </div>`;
   addHistory(code);
 }
 
-function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+$('result').onclick = e => {
+  if (e.target.closest('#favBtn')) { toggleFav(current); show(current); return; }
+  const place = e.target.closest('[data-place]');
+  if (place) return startPlacing(current, +place.dataset.place);
+  const sh = e.target.closest('[data-show]');
+  if (sh) { mapStore = +sh.dataset.show; openTab('map'); highlight = current; renderMap(); }
+};
 
-// ---- history ----
-function getHistory() { try { return JSON.parse(localStorage.getItem('history') || '[]'); } catch { return []; } }
+function toggleFav(code) {
+  favs = favs.includes(code) ? favs.filter(c => c !== code) : [code, ...favs];
+  write('favs', favs);
+}
+
+// ---------- history ----------
 function addHistory(code) {
-  const h = [code, ...getHistory().filter(c => c !== code)].slice(0, 15);
-  try { localStorage.setItem('history', JSON.stringify(h)); } catch {}
+  const h = [code, ...read('history', []).filter(c => c !== code)].slice(0, 15);
+  write('history', h);
   renderHistory();
 }
+function priceCell(code) {
+  const o = offers(code).filter(r => r.eff != null).sort((a, b) => a.eff - b.eff)[0];
+  return o ? `<span class="pr">${shekel(o.eff)}<small>${o.chain}${o.promo ? ' · מבצע' : ''}</small></span>` : '';
+}
 function renderHistory() {
-  const h = getHistory().filter(c => DATA.items[c]);
+  const h = read('history', []).filter(c => DATA.items[c]);
   $('historyTitle').hidden = !h.length;
-  $('history').innerHTML = h.map(c => {
-    const p = DATA.items[c][2].filter(x => x != null);
-    return `<li data-code="${c}"><span>${esc(DATA.items[c][0])}</span><span>${shekel(Math.min(...p))}</span></li>`;
-  }).join('');
+  $('history').innerHTML = h.map(c => `<li data-code="${c}"><span class="nm">${esc(DATA.items[c][0])}</span>${priceCell(c)}</li>`).join('');
 }
 $('history').onclick = e => { const li = e.target.closest('li'); if (li) { show(li.dataset.code); scrollTo({ top: 0, behavior: 'smooth' }); } };
 
-// ---- search ----
-$('q').oninput = () => {
-  const q = $('q').value.trim();
-  const ul = $('suggest');
-  if (!DATA || q.length < 2) { ul.innerHTML = ''; return; }
-  if (/^\d{4,}$/.test(q)) {
-    const code = q.replace(/^0+/, '');
-    ul.innerHTML = DATA.items[code] ? `<li data-code="${code}">${esc(DATA.items[code][0])}</li>` : '';
-    return;
-  }
-  const words = q.split(/\s+/);
-  const hits = [];
+// ---------- search ----------
+function findItems(q, limit = 30) {
+  q = q.trim();
+  if (/^\d{4,}$/.test(q)) { const c = q.replace(/^0+/, ''); return DATA.items[c] ? [c] : []; }
+  const words = q.split(/\s+/), hits = [];
   for (const [code, it] of Object.entries(DATA.items)) {
     const text = it[0] + ' ' + it[1];
-    if (words.every(w => text.includes(w))) {
-      hits.push([code, it]);
-      if (hits.length >= 30) break;
-    }
+    if (words.every(w => text.includes(w))) { hits.push(code); if (hits.length >= limit) break; }
   }
-  ul.innerHTML = hits.map(([c, it]) => `<li data-code="${c}">${esc(it[0])}<small>${esc(it[1])}</small></li>`).join('');
+  return hits;
+}
+$('q').oninput = () => {
+  const q = $('q').value.trim();
+  $('suggest').innerHTML = !DATA || q.length < 2 ? '' :
+    findItems(q).map(c => `<li data-code="${c}">${esc(DATA.items[c][0])}<small>${esc(DATA.items[c][1])}</small></li>`).join('');
 };
 $('q').onkeydown = e => { if (e.key === 'Enter' && /^\d+$/.test($('q').value.trim())) { show($('q').value); $('suggest').innerHTML = ''; } };
 $('suggest').onclick = e => {
@@ -190,7 +356,7 @@ $('suggest').onclick = e => {
   show(li.dataset.code); $('suggest').innerHTML = ''; $('q').value = ''; $('q').blur();
 };
 
-// ---- scanner ----
+// ---------- scanner ----------
 let scanner = null;
 async function stopScan() {
   if (scanner) { try { await scanner.stop(); } catch {} scanner.clear(); scanner = null; }
@@ -216,6 +382,206 @@ $('scanBtn').onclick = async () => {
     $('result').innerHTML = `<div class="card"><h2 class="notfound">אין גישה למצלמה</h2>
       <div class="maker">צריך לאשר לאתר להשתמש במצלמה (בהגדרות הדפדפן). בינתיים אפשר להקליד את מספר הברקוד בחיפוש.</div></div>`;
   }
+};
+
+// ---------- favorites page ----------
+function renderFavs() {
+  const list = favs.filter(c => DATA.items[c]);
+  if (!list.length) {
+    $('favSummary').innerHTML = '';
+    $('favList').innerHTML = `<li class="empty" style="cursor:default;border:0">אין עדיין מועדפים.<br>בכרטיס של מוצר, לחץ על הכוכב ☆ כדי להוסיף אותו לכאן.</li>`;
+    return;
+  }
+  // basket: only products sold in every store, so the totals are comparable
+  const common = list.filter(c => offers(c).every(o => o.eff != null));
+  const totals = DATA.stores.map((s, i) => common.reduce((sum, c) => sum + offers(c)[i].eff, 0));
+  const cheapest = Math.min(...totals);
+  $('favSummary').innerHTML = common.length > 1 ? `<div class="card">
+    <div class="maker" style="margin-bottom:6px">סל המועדפים (${common.length} מוצרים שנמכרים בכל הסניפים, יחידה אחת מכל אחד, כולל מבצעים):</div>
+    ${DATA.stores.map((s, i) => `<div class="row ${totals[i] === cheapest && totals.some(t => t > cheapest) ? 'best' : ''}"><div class="row-top">
+      <div class="store"><b>${s.chain}</b><span>${s.branch}</span></div><div class="price">${shekel(totals[i])}</div></div></div>`).join('')}
+  </div>` : '';
+  $('favList').innerHTML = list.map(c => {
+    const o = offers(c);
+    const detail = o.map(r => `${r.chain}: ${r.eff == null ? '—' : shekel(r.eff) + (r.promo ? ' (מבצע)' : '')}`).join(' · ');
+    return `<li data-code="${c}"><span class="nm">${esc(DATA.items[c][0])}<small>${detail}</small></span>${priceCell(c)}</li>`;
+  }).join('');
+}
+$('favList').onclick = e => { const li = e.target.closest('li[data-code]'); if (li) { openTab('scan'); show(li.dataset.code); scrollTo({ top: 0 }); } };
+
+// ---------- tabs ----------
+const TITLES = { scan: 'כמה זה עולה', favs: 'מועדפים', map: 'מפת הסופר' };
+function openTab(t) {
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  document.querySelectorAll('.page').forEach(p => p.hidden = p.id !== 'page-' + t);
+  $('pageTitle').textContent = TITLES[t];
+  if (t !== 'scan') stopScan();
+  if (t === 'favs') renderFavs();
+  if (t === 'map') renderMap();
+  if (t !== 'map' && editing) setEditing(false);
+}
+document.querySelector('nav.tabs').onclick = e => {
+  const b = e.target.closest('button'); if (!b || !DATA) return;
+  if (placing && b.dataset.tab !== 'map') cancelPlacing();
+  if (b.dataset.tab === 'map') highlight = null;
+  openTab(b.dataset.tab);
+};
+
+// ---------- map ----------
+let mapStore = 0, editing = false, placing = null, highlight = null, bubble = null;
+const mapKey = () => storeKey(DATA.stores[mapStore]);
+
+function renderStoreSeg() {
+  $('storeSeg').innerHTML = DATA.stores.map((s, i) => `<button data-i="${i}" class="${i === mapStore ? 'on' : ''}">${s.chain}</button>`).join('');
+}
+$('storeSeg').onclick = e => {
+  const b = e.target.closest('button'); if (!b || placing) return;
+  mapStore = +b.dataset.i; bubble = null; renderStoreSeg(); renderMap();
+};
+
+function renderMap() {
+  renderStoreSeg();
+  const key = mapKey(), m = mapOf(key), p = pinsOf(key);
+  const el = $('map');
+  el.className = editing ? 'editing' : placing ? 'placing' : '';
+  el.style.backgroundImage = m.bg ? `url(${m.bg})` : '';
+  $('bgClear').hidden = !m.bg;
+  const q = $('mapQ').value.trim();
+  const matches = q.length >= 2 ? new Set(Object.keys(p).filter(c => DATA.items[c] && (DATA.items[c][0] + ' ' + DATA.items[c][1]).includes(q))) : null;
+
+  let html = m.sections.map(s => `<div class="sec" data-id="${s.id}" style="left:${s.x}%;top:${s.y}%;width:${s.w}%;height:${s.h}%">${esc(s.name)}<span class="grip"></span></div>`).join('');
+  html += Object.entries(p).filter(([c]) => DATA.items[c]).map(([c, [x, y]]) => {
+    const cls = highlight === c || matches?.has(c) ? 'hit' : (matches || highlight) ? 'dim' : '';
+    return `<div class="pin ${cls}" data-code="${c}" style="left:${x}%;top:${y}%"></div>`;
+  }).join('');
+  const b = bubble || (highlight && p[highlight] ? highlight : null) || (matches?.size === 1 ? [...matches][0] : null);
+  if (b && p[b] && !editing) html += `<div class="bubble" data-code="${b}" style="left:${p[b][0]}%;top:${p[b][1]}%">${esc(DATA.items[b][0])} ›</div>`;
+  if (!m.sections.length && !m.bg && !Object.keys(p).length && !placing)
+    html += `<div class="map-empty">המפה של הסניף הזה ריקה.<br><br>לחץ "עריכת מפה" והוסף אזורים (מעברים, מקררים, ירקות, קופות), או צלם את השלט של הסניף ושים אותו כתמונת רקע.</div>`;
+  el.innerHTML = html;
+}
+$('mapQ').oninput = () => { bubble = null; highlight = null; renderMap(); };
+
+function pct(e) {
+  const r = $('map').getBoundingClientRect();
+  return [Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)), Math.min(100, Math.max(0, (e.clientY - r.top) / r.height * 100))];
+}
+const round1 = n => Math.round(n * 10) / 10;
+
+// placing a product pin
+function startPlacing(code, storeIndex) {
+  placing = code; mapStore = storeIndex; highlight = code; bubble = null;
+  $('placeText').textContent = `הקש על המפה במקום שבו נמצא: ${DATA.items[code][0]}`;
+  $('placeBanner').hidden = false;
+  $('viewTools').hidden = true;
+  openTab('map');
+}
+function cancelPlacing() {
+  placing = null; $('placeBanner').hidden = true; $('viewTools').hidden = false;
+}
+$('placeCancel').onclick = () => { const c = placing; cancelPlacing(); openTab('scan'); show(c); };
+
+// map pointer handling: tap pin / tap to place / drag & resize sections while editing
+let drag = null;
+$('map').addEventListener('pointerdown', e => {
+  if (placing) {
+    const [x, y] = pct(e);
+    pinsOf(mapKey())[placing] = [round1(x), round1(y)];
+    write('pins', pins);
+    const c = placing; cancelPlacing(); openTab('scan'); show(c);
+    return;
+  }
+  if (editing) {
+    const sec = e.target.closest('.sec'); if (!sec) return;
+    const s = mapOf(mapKey()).sections.find(s => s.id === sec.dataset.id);
+    const [x, y] = pct(e);
+    drag = { s, el: sec, mode: e.target.classList.contains('grip') ? 'size' : 'move', x0: x, y0: y, orig: { ...s }, moved: false };
+    sec.setPointerCapture(e.pointerId);
+    e.preventDefault();
+    return;
+  }
+  const bub = e.target.closest('.bubble');
+  if (bub) { openTab('scan'); show(bub.dataset.code); scrollTo({ top: 0 }); return; }
+  const pin = e.target.closest('.pin');
+  bubble = pin ? pin.dataset.code : null;
+  if (!pin) highlight = null;
+  renderMap();
+});
+$('map').addEventListener('pointermove', e => {
+  if (!drag) return;
+  const [x, y] = pct(e), dx = x - drag.x0, dy = y - drag.y0, o = drag.orig, s = drag.s;
+  if (Math.abs(dx) + Math.abs(dy) > 0.8) drag.moved = true;
+  if (drag.mode === 'move') {
+    s.x = round1(Math.min(100 - o.w, Math.max(0, o.x + dx)));
+    s.y = round1(Math.min(100 - o.h, Math.max(0, o.y + dy)));
+  } else {
+    s.w = round1(Math.min(100 - o.x, Math.max(5, o.w + dx)));
+    s.h = round1(Math.min(100 - o.y, Math.max(3, o.h + dy)));
+  }
+  Object.assign(drag.el.style, { left: s.x + '%', top: s.y + '%', width: s.w + '%', height: s.h + '%' });
+});
+$('map').addEventListener('pointerup', () => {
+  if (!drag) return;
+  const { s, moved } = drag; drag = null;
+  if (!moved) {
+    const name = prompt('שם האזור (השאר ריק כדי למחוק):', s.name);
+    if (name === null) return;
+    const m = mapOf(mapKey());
+    if (!name.trim()) m.sections = m.sections.filter(x => x !== s);
+    else s.name = name.trim();
+  }
+  write('maps', maps); renderMap();
+});
+
+function setEditing(on) {
+  editing = on; bubble = null;
+  $('editTools').hidden = !on; $('viewTools').hidden = on; $('editHint').hidden = !on; $('mapSearchBox').hidden = on;
+  renderMap();
+}
+$('editBtn').onclick = () => setEditing(true);
+$('doneBtn').onclick = () => { write('maps', maps); setEditing(false); };
+$('addSecBtn').onclick = () => {
+  const name = prompt('שם האזור (למשל: מעבר 3 – פסטות, מקררים, ירקות):');
+  if (!name || !name.trim()) return;
+  const m = mapOf(mapKey()), n = m.sections.length;
+  m.sections.push({ id: Date.now().toString(36), name: name.trim(), x: 10 + (n * 7) % 50, y: 8 + (n * 9) % 70, w: 30, h: 12 });
+  write('maps', maps); renderMap();
+};
+$('bgBtn').onclick = () => $('bgFile').click();
+$('bgFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const img = await createImageBitmap(f);
+  const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const m = mapOf(mapKey()), old = m.bg;
+  m.bg = c.toDataURL('image/jpeg', 0.7);
+  if (!write('maps', maps)) m.bg = old;
+  renderMap();
+};
+$('bgClear').onclick = () => { if (confirm('להסיר את תמונת הרקע?')) { mapOf(mapKey()).bg = null; write('maps', maps); renderMap(); } };
+
+// ---------- backup ----------
+$('exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify({ favs, maps, pins, history: read('history', []) })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kama-ze-ole-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!confirm('השחזור יחליף את המועדפים והמפות שבטלפון הזה. להמשיך?')) return;
+    favs = d.favs || []; maps = d.maps || {}; pins = d.pins || {};
+    write('favs', favs); write('maps', maps); write('pins', pins); write('history', d.history || []);
+    renderMap(); renderHistory();
+    alert('הגיבוי שוחזר.');
+  } catch { alert('הקובץ הזה לא נראה כמו גיבוי של האפליקציה.'); }
 };
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
