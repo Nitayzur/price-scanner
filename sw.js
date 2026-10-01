@@ -1,5 +1,5 @@
 // App shell: cache first (page: network first). Prices: network first, fall back to the saved copy when offline.
-const CACHE = 'price-scanner-v6';
+const CACHE = 'price-scanner-v7';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon.svg', 'vendor/barcode-detector.js', 'vendor/zxing_reader.wasm'];
 
 self.addEventListener('install', e => {

@@ -181,6 +181,7 @@ def main():
     # Dates are never removed, so a product that disappears for a while and returns is not "new" again.
     seen_path = data_dir / "first_seen.json"
     seen = json.loads(seen_path.read_text(encoding="utf-8")) if seen_path.exists() else {}
+    since = seen.pop("__since__", {})  # date tracking began, per store
     cutoff = (now_dt - timedelta(days=NEW_DAYS)).strftime("%Y-%m-%d")
     new = {}
     for s, st, ok in zip(STORES, per_store, fresh):
@@ -188,6 +189,7 @@ def main():
         baseline = k not in seen
         if ok:  # the baseline must come from a real download, never from kept-over prices
             known = seen.setdefault(k, {})
+            since.setdefault(k, today)
             for code in st:
                 known.setdefault(code, "0" if baseline else today)
         known = seen.get(k, {})
@@ -195,8 +197,8 @@ def main():
         new[k] = sorted(([c, st[c]["name"], st[c]["price"], d] for c, d in known.items() if d != "0" and d >= cutoff and c in st),
                         key=lambda x: (x[3], x[2]), reverse=True)
         print(f"  {k}: {len(new[k])} new in the last {NEW_DAYS} days" + (" (baseline today)" if baseline and ok else " (no baseline yet)" if baseline else ""))
-    seen_path.write_text(json.dumps(seen, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    (data_dir / "new.json").write_text(json.dumps({"updated": data["updated"], "days": NEW_DAYS, "stores": new},
+    seen_path.write_text(json.dumps({"__since__": since, **seen}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    (data_dir / "new.json").write_text(json.dumps({"updated": data["updated"], "days": NEW_DAYS, "since": since, "stores": new},
                                                   ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
