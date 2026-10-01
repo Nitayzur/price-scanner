@@ -96,6 +96,14 @@
   .list li .nm small { display: block; color: var(--muted); font-size: 13px; }
   .list li .pr { white-space: nowrap; text-align: left; font-weight: 700; }
   .list li .pr small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .group-title { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; font-weight: 700; margin: 20px 0 4px; padding-bottom: 4px; border-bottom: 2px solid var(--brand); }
+  .group-title span { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .new-item { display: flex; gap: 10px; align-items: center; padding: 11px 2px; border-bottom: 1px solid var(--line); }
+  .new-item .nm { flex: 1; cursor: pointer; }
+  .new-item .nm small { display: block; color: var(--muted); font-size: 13px; }
+  .new-item .pr { font-weight: 700; white-space: nowrap; text-align: left; }
+  .new-item .pr small { display: block; font-weight: 400; color: var(--promo); font-size: 12px; }
+  .img-link { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); text-decoration: none; font-size: 18px; }
   .status, .empty { color: var(--muted); text-align: center; padding: 30px 8px; }
 
   /* tabs */
@@ -174,6 +182,14 @@
     <ul class="list" id="favList"></ul>
   </section>
 
+  <!-- ===== new in store ===== -->
+  <section class="page" id="page-new" hidden>
+    <div class="seg" id="newSeg"></div>
+    <div class="search"><input id="newQ" type="search" placeholder="סינון לפי שם…" autocomplete="off"></div>
+    <div class="toolbar"><button class="btn small" id="nfBtn">רק מוצרים שאינם מזון</button></div>
+    <div id="newList"></div>
+  </section>
+
   <!-- ===== map ===== -->
   <section class="page" id="page-map" hidden>
     <div class="seg" id="storeSeg"></div>
@@ -212,6 +228,8 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M14 8v8M17 8v8"/></svg>סריקה</button>
   <button data-tab="favs">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>מועדפים</button>
+  <button data-tab="new">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 12v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-8M2 7h20v5H2zM12 21V7M12 7S10.5 3 8 3a2 2 0 0 0 0 4M12 7s1.5-4 4-4a2 2 0 0 1 0 4"/></svg>חדש בסניף</button>
   <button data-tab="map">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7-6.1-7-11.5a7 7 0 0 1 14 0C19 14.9 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>מפת הסופר</button>
 </nav>
@@ -219,7 +237,7 @@
 <script>
 let DATA = null;
 const $ = id => document.getElementById(id);
-const shekel = n => '₪' + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, '');
+const shekel = n => '₪' + (Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, '');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---------- saved state (this device only) ----------
@@ -561,8 +579,62 @@ function renderFavs() {
 }
 $('favList').onclick = e => { const li = e.target.closest('li[data-code]'); if (li) { openTab('scan'); show(li.dataset.code); scrollTo({ top: 0 }); } };
 
+// ---------- new in store ----------
+let NEW = null;
+let newStore = null;  // opens on Osher Ad
+let nfOnly = false;
+const PRICE_GROUPS = [[0, 100, 'עד 100 ש״ח'], [100, 500, '100 עד 500 ש״ח'], [500, 1000, '500 עד 1,000 ש״ח'], [1000, Infinity, '1,000 ש״ח ומעלה']];
+
+async function renderNew() {
+  if (!NEW) {
+    $('newList').innerHTML = '<div class="status">טוען…</div>';
+    try { NEW = await fetch('data/new.json', { cache: 'no-cache' }).then(r => r.json()); }
+    catch { $('newList').innerHTML = '<div class="status">לא הצלחתי לטעון. בדוק חיבור לאינטרנט.</div>'; return; }
+  }
+  if (newStore == null) newStore = Math.max(0, DATA.stores.findIndex(s => s.chain === 'אושר עד'));
+  $('newSeg').innerHTML = DATA.stores.map((s, i) => `<button data-i="${i}" class="${i === newStore ? 'on' : ''}">${s.chain}</button>`).join('');
+  const store = DATA.stores[newStore];
+  const all = NEW.stores[storeKey(store)];
+  if (!all) {
+    $('newList').innerHTML = `<div class="empty">עוד אין נתונים על מוצרים חדשים ב${store.chain}.<br>המעקב התחיל עכשיו. מחר בבוקר יופיעו כאן מוצרים שנוספו לסניף מאז.</div>`;
+    return;
+  }
+  const q = $('newQ').value.trim();
+  // the chain marks household goods, electrical and gift items with the manufacturer "N-F" (non-food)
+  const isNF = code => /^n-?f$/i.test(((DATA.items[code] || [])[1] || '').trim());
+  $('nfBtn').classList.toggle('primary', nfOnly);
+  const list = all.filter(x => (!q || q.split(/\s+/).every(w => x[1].includes(w))) && (!nfOnly || isNF(x[0])));
+  if (!list.length) {
+    $('newList').innerHTML = `<div class="empty">${q || nfOnly ? 'אין מוצר חדש שמתאים לסינון.' : `לא נוספו מוצרים חדשים ב${store.chain} ב־${NEW.days} הימים האחרונים.<br>הרשימה מתעדכנת כל בוקר.`}</div>`;
+    return;
+  }
+  const fmtDate = d => d.slice(8, 10) + '.' + d.slice(5, 7);
+  $('newList').innerHTML = `<p class="fineprint" style="margin-top:0">מוצרים שהופיעו לראשונה ברשימת המחירים של ${store.chain} ${store.branch} ב־${NEW.days} הימים האחרונים. אין בקבצים סימון של מלאי, כך שמוצר יכול להופיע כאן גם אם כבר אזל.</p>` +
+    PRICE_GROUPS.map(([lo, hi, title]) => {
+      const g = list.filter(x => x[2] >= lo && x[2] < hi);
+      if (!g.length) return '';
+      return `<div class="group-title">${title}<span>${g.length} מוצרים</span></div>` + g.map(([code, name, price, date]) => {
+        const item = DATA.items[code];
+        const promo = item && item[3] && item[3][newStore];
+        const img = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(name);
+        return `<div class="new-item">
+          <a class="img-link" href="${img}" target="_blank" rel="noopener" aria-label="תמונות בגוגל">🖼️</a>
+          <span class="nm" data-code="${code}">${esc(name)}<small>נוסף ב־${fmtDate(date)}${item && item[1] ? ' · ' + esc(item[1]) : ''}</small></span>
+          <span class="pr">${shekel(price)}${promo ? `<small>מבצע: ${promo[0] == 1 ? shekel(promo[1]) : promo[0] + ' ב־' + shekel(promo[1])}</small>` : ''}</span>
+        </div>`;
+      }).join('');
+    }).join('');
+}
+$('newSeg').onclick = e => { const b = e.target.closest('button'); if (b) { newStore = +b.dataset.i; renderNew(); } };
+$('newQ').oninput = () => renderNew();
+$('nfBtn').onclick = () => { nfOnly = !nfOnly; renderNew(); };
+$('newList').onclick = e => {
+  const nm = e.target.closest('.nm[data-code]');
+  if (nm) { openTab('scan'); show(nm.dataset.code); scrollTo({ top: 0 }); }
+};
+
 // ---------- tabs ----------
-const TITLES = { scan: 'כמה זה עולה', favs: 'מועדפים', map: 'מפת הסופר' };
+const TITLES = { scan: 'כמה זה עולה', favs: 'מועדפים', new: 'חדש בסניף', map: 'מפת הסופר' };
 function openTab(t) {
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   document.querySelectorAll('.page').forEach(p => p.hidden = p.id !== 'page-' + t);
@@ -570,6 +642,7 @@ function openTab(t) {
   if (t !== 'scan') stopScan();
   if (t === 'favs') renderFavs();
   if (t === 'map') renderMap();
+  if (t === 'new') renderNew();
   if (t !== 'map' && editing) setEditing(false);
 }
 document.querySelector('nav.tabs').onclick = e => {
