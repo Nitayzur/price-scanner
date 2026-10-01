@@ -1,7 +1,9 @@
 name: update prices
 on:
   schedule:
-    - cron: "15 6 * * *"   # 09:15 Israel (summer) — after both chains publish the morning files
+    # Osher Ad publishes the day's files around 08:00 Israel time; run twice so a late file or a failed run is caught
+    - cron: "15 7 * * *"   # 10:15 summer / 09:15 winter
+    - cron: "15 13 * * *"  # 16:15 summer / 15:15 winter
   workflow_dispatch:
 permissions:
   contents: write
